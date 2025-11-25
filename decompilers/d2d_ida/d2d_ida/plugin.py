@@ -41,7 +41,8 @@ class IDBHooks(ida_idp.IDB_Hooks):
             import ida_struct, ida_enum
             return bool(ida_struct.is_member_id(ea) or ida_struct.get_struc(ea) or ida_enum.get_enum_name(ea))
         else:
-            return True
+            # In the new type system, type changes do not map directly to an ea (triggering renamed hook)
+            return False
 
     def renamed(self, ea, new_name, local_name):
         if self.is_type_change_on_ea(ea):
