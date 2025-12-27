@@ -208,15 +208,23 @@ class GDBDecompilerClient(DecompilerClient):
 #
 
 class DecompilerCommand(gdb.Command):
+    """Connect to and control decompilers from GDB"""
+
     def __init__(self, decompiler, gdb_client):
         super(DecompilerCommand, self).__init__("decompiler", gdb.COMMAND_USER)
         self.decompiler = decompiler
         self.gdb_client = gdb_client
         self.arg_parser = self._init_arg_parser()
 
-    @only_if_gdb_running
     def invoke(self, arg, from_tty):
         raw_args = arg.split()
+
+        # Handle help requests (--help, -h, help) or show usage when no args provided
+        if not raw_args or '--help' in raw_args or '-h' in raw_args or 'help' in raw_args:
+            self.arg_parser.print_help()
+            return
+
+        # Parse arguments
         try:
             f = io.StringIO()
             with contextlib.redirect_stderr(f):
@@ -232,11 +240,24 @@ class DecompilerCommand(gdb.Command):
             self.arg_parser.print_help()
             return
 
+        # Check if GDB is running before executing commands
+        if not is_alive():
+            warn("No debugging session active")
+            print("\nThe 'decompiler' command requires an active debugging session.")
+            print("Start debugging with 'run', 'start', or attach to a process first.")
+            print("\nFor usage information, run: decompiler --help")
+            return
+
         self._handle_cmd(args)
 
     @staticmethod
     def _init_arg_parser():
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(epilog="""
+        Example runs:
+        `decompiler connect ida` |
+        `decompiler connect ghidra --host 192.168.1.2` |
+        `decompiler connect ida --base-addr-start 0x00007ffff7452000 --base-addr-end 0x00007ffff766d000`
+        """)
         commands = ["connect", "disconnect", "info"]
         parser.add_argument(
             'command', type=str, choices=commands, help="""
